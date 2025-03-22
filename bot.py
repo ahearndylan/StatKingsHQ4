@@ -1,7 +1,7 @@
 import tweepy
 from nba_api.stats.endpoints import leaguedashplayerstats
 from datetime import datetime
-import time
+import requests
 import json
 import os
 
@@ -23,6 +23,19 @@ client = tweepy.Client(
 )
 
 # ======================= #
+#   SUPABASE CONFIG       #
+# ======================= #
+SUPABASE_URL = "https://fjtxowbjnxclzcogostk.supabase.co/rest/v1/seasonkings"
+SUPABASE_API_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZqdHhvd2JqbnhjbHpjb2dvc3RrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI2MDE5NTgsImV4cCI6MjA1ODE3Nzk1OH0.LPkFw-UX6io0F3j18Eefd1LmeAGGXnxL4VcCLOR_c1Q"
+
+HEADERS = {
+    "apikey": SUPABASE_API_KEY,
+    "Authorization": f"Bearer {SUPABASE_API_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "resolution=merge-duplicates"
+}
+
+# ======================= #
 #     NBA STATS LOGIC     #
 # ======================= #
 
@@ -33,7 +46,6 @@ def get_season_leaders():
     )
     players = stats.get_normalized_dict()["LeagueDashPlayerStats"]
 
-    # Sort by Points Per Game (calculated manually)
     top_players = sorted(players, key=lambda x: x["PTS"] / x["GP"] if x["GP"] else 0, reverse=True)[:4]
 
     player_info = []
@@ -56,32 +68,27 @@ def compose_tweet(player_info):
     tweet += "#NBA #StatKingsHQ"
     return tweet
 
-def update_season_json(player_info):
-    new_entry = {
-        "date": datetime.now().strftime("%m/%d/%Y"),
-        "leaders": []
+def update_supabase_season_data(player_info):
+    date_str = datetime.now().strftime("%Y-%m-%d")
+    payload = {
+        "date": date_str,
+        "data": {
+            "leaders": [
+                {
+                    "name": name,
+                    "team": team,
+                    "ppg": ppg,
+                    "points": total_points
+                } for name, team, ppg, total_points in player_info
+            ]
+        }
     }
 
-    for name, team, ppg, total_points in player_info:
-        new_entry["leaders"].append({
-            "name": name,
-            "team": team,
-            "ppg": ppg,
-            "points": total_points
-        })
-
-    json_file = "season.json"
-
-    if os.path.exists(json_file):
-        with open(json_file, "r") as f:
-            data = json.load(f)
+    res = requests.post(SUPABASE_URL, headers=HEADERS, data=json.dumps(payload))
+    if res.status_code in (200, 201):
+        print(f"✅ Supabase updated: {res.json()}")
     else:
-        data = {"nights": []}
-
-    data["nights"].insert(0, new_entry)  # Add newest to top
-
-    with open(json_file, "w") as f:
-        json.dump(data, f, indent=2)
+        print("❌ Supabase write error:", res.text)
 
 # ======================= #
 #        MAIN BOT         #
@@ -91,12 +98,9 @@ def run_bot():
     try:
         player_info = get_season_leaders()
         tweet = compose_tweet(player_info)
-
         print("Tweeting:\n", tweet)
         client.create_tweet(text=tweet)
-
-        update_season_json(player_info)
-
+        update_supabase_season_data(player_info)
     except Exception as e:
         print("Error:", e)
 
