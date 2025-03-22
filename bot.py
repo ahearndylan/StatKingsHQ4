@@ -2,6 +2,8 @@ import tweepy
 from nba_api.stats.endpoints import leaguedashplayerstats
 from datetime import datetime
 import time
+import json
+import os
 
 # ======================= #
 # TWITTER AUTHENTICATION  #
@@ -45,19 +47,41 @@ def get_season_leaders():
 
     return player_info
 
-
 def compose_tweet(player_info):
     tweet = "👑 Season Scoring Leaders\n\n"
-    
     medals = ["🥇", "🥈", "🥉"]
-    
     for i, (name, team, ppg, total_points) in enumerate(player_info, 1):
         rank = medals[i - 1] if i <= 3 else f"{i}."
         tweet += f"{rank} {name} ({team}): {ppg} PPG | {total_points} PTS\n\n"
-
     tweet += "#NBA #StatKingsHQ"
     return tweet
 
+def update_season_json(player_info):
+    new_entry = {
+        "date": datetime.now().strftime("%m/%d/%Y"),
+        "leaders": []
+    }
+
+    for name, team, ppg, total_points in player_info:
+        new_entry["leaders"].append({
+            "name": name,
+            "team": team,
+            "ppg": ppg,
+            "points": total_points
+        })
+
+    json_file = "season.json"
+
+    if os.path.exists(json_file):
+        with open(json_file, "r") as f:
+            data = json.load(f)
+    else:
+        data = {"nights": []}
+
+    data["nights"].insert(0, new_entry)  # Add newest to top
+
+    with open(json_file, "w") as f:
+        json.dump(data, f, indent=2)
 
 # ======================= #
 #        MAIN BOT         #
@@ -70,6 +94,8 @@ def run_bot():
 
         print("Tweeting:\n", tweet)
         client.create_tweet(text=tweet)
+
+        update_season_json(player_info)
 
     except Exception as e:
         print("Error:", e)
