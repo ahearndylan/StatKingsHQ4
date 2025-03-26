@@ -46,7 +46,9 @@ def get_season_leaders():
     )
     players = stats.get_normalized_dict()["LeagueDashPlayerStats"]
 
-    top_players = sorted(players, key=lambda x: x["PTS"] / x["GP"] if x["GP"] else 0, reverse=True)[:4]
+    # Filter out players with 0 games just in case, then sort by total points
+    filtered_players = [p for p in players if p["GP"] > 0]
+    top_players = sorted(filtered_players, key=lambda x: x["PTS"], reverse=True)[:4]
 
     player_info = []
     for player in top_players:
@@ -64,7 +66,7 @@ def compose_tweet(player_info):
     medals = ["🥇", "🥈", "🥉"]
     for i, (name, team, ppg, total_points) in enumerate(player_info, 1):
         rank = medals[i - 1] if i <= 3 else f"{i}."
-        tweet += f"{rank} {name} ({team}): {ppg} PPG | {total_points} PTS\n\n"
+        tweet += f"{rank} {name} ({team}): {total_points} PTS | {ppg} PPG\n\n"
     tweet += "#NBA #StatKingsHQ"
     return tweet
 
