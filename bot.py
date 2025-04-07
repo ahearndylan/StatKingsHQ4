@@ -67,7 +67,7 @@ def compose_tweet(player_info):
     for i, (name, team, ppg, total_points) in enumerate(player_info, 1):
         rank = medals[i - 1] if i <= 3 else f"{i}."
         tweet += f"{rank} {name} ({team}): {total_points} PTS | {ppg} PPG\n\n"
-    tweet += "#NBA #StatKingsHQ"
+    tweet += "#NBA #CourtKingsHQ"
     return tweet
 
 def update_supabase_season_data(player_info):
